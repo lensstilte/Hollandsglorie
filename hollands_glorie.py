@@ -16,13 +16,13 @@ ACCOUNT_KEYS = [
 
 # Targets 1 t/m 10: vul hier de Bluesky handles in.
 # Laat leeg ("") als je die target (nog) niet wilt gebruiken.
-TARGET_HANDLE_1 = ""   # bv: "creator1.bsky.social"
-TARGET_HANDLE_2 = ""
-TARGET_HANDLE_3 = ""
-TARGET_HANDLE_4 = ""
-TARGET_HANDLE_5 = ""
-TARGET_HANDLE_6 = ""
-TARGET_HANDLE_7 = ""
+TARGET_HANDLE_1 = "bleuskybeauty.bsky.social"
+TARGET_HANDLE_2 = "theysaidnothing.bsky.social"
+TARGET_HANDLE_3 = "wsimonde.bsky.social"
+TARGET_HANDLE_4 = "velvetdesire.bsky.social"
+TARGET_HANDLE_5 = "theysaidnothing.bsky.social"
+TARGET_HANDLE_6 = "steefschrijber1970.bsky.social"
+TARGET_HANDLE_7 = "sensushots.bsky.social"
 TARGET_HANDLE_8 = ""
 TARGET_HANDLE_9 = ""
 TARGET_HANDLE_10 = ""
