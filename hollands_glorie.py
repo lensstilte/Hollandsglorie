@@ -26,7 +26,7 @@ ACCOUNT_KEYS = [
 # TARGET HANDLES (10 slots, leeg = skip)
 # Je hebt deze zelf al ingevuld; pas ze hier aan wanneer nodig.
 # --------------------------------------------------
-TARGET_HANDLE_1 = "bleuskybeauty.bsky.social"
+TARGET_HANDLE_1 = "@dmphotos.bsky.social"
 TARGET_HANDLE_2 = "theysaidnothing.bsky.social"
 TARGET_HANDLE_3 = "wsimonde.bsky.social"
 TARGET_HANDLE_4 = "velvetdesire.bsky.social"
