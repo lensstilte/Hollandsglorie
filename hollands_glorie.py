@@ -33,9 +33,9 @@ TARGET_HANDLE_4 = "velvetdesire.bsky.social"
 TARGET_HANDLE_5 = "sensushots.bsky.social"
 TARGET_HANDLE_6 = "steefschrijber1970.bsky.social"
 TARGET_HANDLE_7 = "damienmanson.bsky.social"
-TARGET_HANDLE_8 = "boxy0075.bsky.social"
+TARGET_HANDLE_8 = ""
 TARGET_HANDLE_9 = ""
-TARGET_HANDLE_10 = ""
+TARGET_HANDLE_10 = "boxy0075.bsky.social"
 
 # Volgorde: 10 -> 1, zodat 1 als laatste wordt gepost en dus bovenaan staat.
 TARGET_HANDLES: List[str] = [
