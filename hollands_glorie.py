@@ -6,6 +6,11 @@ from typing import List, Optional
 from atproto import Client
 
 # --------------------------------------------------
+# Config
+# --------------------------------------------------
+AUTHOR_FEED_LIMIT = 200  # ⬅️ HIER pas je het aantal terug te kijken posts aan
+
+# --------------------------------------------------
 # Logging basic setup
 # --------------------------------------------------
 logging.basicConfig(
@@ -24,7 +29,6 @@ ACCOUNT_KEYS = [
 
 # --------------------------------------------------
 # TARGET HANDLES (10 slots, leeg = skip)
-# Je hebt deze zelf al ingevuld; pas ze hier aan wanneer nodig.
 # --------------------------------------------------
 TARGET_HANDLE_1 = "dmphotos.bsky.social"
 TARGET_HANDLE_2 = "theysaidnothing.bsky.social"
@@ -37,7 +41,7 @@ TARGET_HANDLE_8 = ""
 TARGET_HANDLE_9 = ""
 TARGET_HANDLE_10 = "boxy0075.bsky.social"
 
-# Volgorde: 10 -> 1, zodat 1 als laatste wordt gepost en dus bovenaan staat.
+# Volgorde: 10 -> 1 (1 eindigt bovenaan)
 TARGET_HANDLES: List[str] = [
     TARGET_HANDLE_10,
     TARGET_HANDLE_9,
@@ -56,16 +60,12 @@ TARGET_HANDLES: List[str] = [
 # Helpers
 # --------------------------------------------------
 def get_client_for_account(label: str) -> Optional[Client]:
-    """
-    Haal username/password uit env en log in.
-    Als er geen secrets zijn ingevuld voor dit account: skippen.
-    """
     username = os.getenv(f"BSKY_USERNAME_{label}")
     password = os.getenv(f"BSKY_PASSWORD_{label}")
 
     if not username or not password:
         logging.warning(
-            "Geen credentials gevonden voor %s (username/password), account wordt geskipt.",
+            "Geen credentials gevonden voor %s, account wordt geskipt.",
             label,
         )
         return None
@@ -81,94 +81,64 @@ def get_client_for_account(label: str) -> Optional[Client]:
     return client
 
 
-def fetch_recent_posts(client: Client, actor_handle: str, limit: int = 50):
-    """
-    Haal recente posts van de target-acteur op.
-    We gebruiken 'posts_no_replies' zodat je alleen eigen posts / reposts krijgt, geen replies.
-    """
-    logging.info("Posts ophalen van %s (limit=%d)...", actor_handle, limit)
+def fetch_recent_posts(client: Client, actor_handle: str):
+    logging.info(
+        "Posts ophalen van %s (limit=%d)...",
+        actor_handle,
+        AUTHOR_FEED_LIMIT,
+    )
     feed = client.get_author_feed(
         actor=actor_handle,
-        limit=limit,
+        limit=AUTHOR_FEED_LIMIT,
         filter="posts_no_replies",
     )
     return list(feed.feed or [])
 
 
 def has_media(post_view) -> bool:
-    """
-    True als de post media bevat (foto / video / embed),
-    False als het tekst-only is.
-    """
     embed = getattr(post_view, "embed", None)
     if not embed:
         return False
 
-    # Direct images
     images = getattr(embed, "images", None)
     if isinstance(images, list) and images:
         return True
 
-    # Sommige embed-varianten hebben .media.images
     media = getattr(embed, "media", None)
-    if media is not None:
+    if media:
         media_images = getattr(media, "images", None)
         if isinstance(media_images, list) and media_images:
             return True
 
-    # Externe embed met thumbnail (kan bijv. video zijn)
     external = getattr(embed, "external", None)
-    if external is not None:
-        thumb = getattr(external, "thumb", None)
-        if thumb:
-            return True
+    if external and getattr(external, "thumb", None):
+        return True
 
     return False
 
 
 def is_valid_post_for_target(feed_post, target_handle: str) -> bool:
-    """
-    Filter:
-    - Geen tekst-only -> moet media hebben.
-    - Geen reposts, behalve:
-        * target = bleuskybeauty.bsky.social
-          -> repost is toegestaan als de originele auteur dezelfde handle is.
-    """
     post_view = feed_post.post
 
-    # 1) vereist media
     if not has_media(post_view):
         return False
 
-    # 2) check of het een repost is
-    reason = getattr(feed_post, "reason", None)
-    is_repost = reason is not None
-
-    # Normaal: géén reposts
+    is_repost = getattr(feed_post, "reason", None) is not None
     if not is_repost:
         return True
 
-    # Uitzondering: bleuskybeauty.bsky.social
     target_lower = target_handle.lower()
     if target_lower == "bleuskybeauty.bsky.social":
         author = getattr(post_view, "author", None)
-        author_handle = getattr(author, "handle", "").lower() if author else ""
-        # Alleen toestaan als originele auteur dezelfde handle is
-        if author_handle == target_lower:
-            return True
-        return False
+        return (
+            author
+            and author.handle.lower() == target_lower
+        )
 
-    # Voor alle andere targets: reposts skippen
     return False
 
 
 def choose_posts_for_run(feed_posts: List, num_random_older: int = 2) -> List:
-    """
-    input: lijst feed_posts (nieuwste eerst, zoals Bluesky ze geeft)
-    - kies nieuwste (index 0)
-    - plus num_random_older willekeurige oudere uit de rest
-    - sorteert de selectie van oud -> nieuw zodat de oudste als eerste gepost wordt
-    """
     if not feed_posts:
         return []
 
@@ -178,116 +148,79 @@ def choose_posts_for_run(feed_posts: List, num_random_older: int = 2) -> List:
     selected = [newest]
 
     if older:
-        k = min(num_random_older, len(older))
-        selected.extend(random.sample(older, k=k))
-
-    # Nu sorteren we ze van oud -> nieuw op indexed_at (fallback: created_at/empty string)
-    def _sort_key(fp):
-        pv = fp.post
-        return (
-            getattr(pv, "indexed_at", None)
-            or getattr(pv, "created_at", None)
-            or ""
+        selected.extend(
+            random.sample(older, k=min(num_random_older, len(older)))
         )
 
-    selected.sort(key=_sort_key)
+    selected.sort(
+        key=lambda fp: (
+            getattr(fp.post, "indexed_at", None)
+            or getattr(fp.post, "created_at", "")
+        )
+    )
     return selected
 
 
 def unrepost_like_and_repost(client: Client, feed_post) -> None:
-    """
-    - Als deze post al is gerepost door deze bot: oude repost verwijderen.
-    - Daarna opnieuw repost-en.
-    - Als er nog geen like is, ook liken.
-    """
-    post_view = feed_post.post
-    uri = post_view.uri
-    cid = post_view.cid
+    post = feed_post.post
+    viewer = getattr(post, "viewer", None)
 
-    viewer = getattr(post_view, "viewer", None)
     repost_uri = getattr(viewer, "repost", None) if viewer else None
     like_uri = getattr(viewer, "like", None) if viewer else None
 
-    # Oude repost verwijderen
     if repost_uri:
-        logging.info("  Oude repost gevonden (%s), verwijderen...", repost_uri)
+        logging.info("  Oude repost verwijderen...")
         try:
             client.delete_repost(repost_uri)
-            logging.info("  Oude repost verwijderd.")
         except Exception as e:
-            logging.warning("  Kon oude repost niet verwijderen (%s): %s", repost_uri, e)
+            logging.warning("  Kon oude repost niet verwijderen: %s", e)
 
-    # Nieuwe repost
-    logging.info("  Nieuwe repost van %s...", uri)
     try:
-        client.repost(uri=uri, cid=cid)
+        client.repost(uri=post.uri, cid=post.cid)
         logging.info("  Repost gelukt.")
     except Exception as e:
-        logging.error("  Repost mislukt voor %s: %s", uri, e)
+        logging.error("  Repost mislukt: %s", e)
         return
 
-    # Like (alleen als nog geen like)
-    if like_uri:
-        logging.info("  Post was al geliked, laten we zo.")
-    else:
-        logging.info("  Nog geen like, nu liken...")
+    if not like_uri:
         try:
-            client.like(uri=uri, cid=cid)
+            client.like(uri=post.uri, cid=post.cid)
             logging.info("  Like gelukt.")
         except Exception as e:
-            logging.warning("  Like mislukt voor %s: %s", uri, e)
+            logging.warning("  Like mislukt: %s", e)
 
 
 def process_account(label: str) -> None:
-    """
-    Verwerk één bot-account (BEAUTYFAN / HOTBLEUSKY / DMPHOTOS):
-    - login
-    - per niet-lege target handle:
-        * posts ophalen
-        * filteren op 'geldige' posts (media + geen repost, behalve special-case BleuskyBeauty)
-        * nieuwste + 2 random oudere kiezen
-        * unrepost + repost + like
-    """
     logging.info("=== Start account %s ===", label)
     client = get_client_for_account(label)
     if not client:
-        logging.warning("Account %s wordt overgeslagen (geen login).", label)
         return
 
     for target_handle in TARGET_HANDLES:
         if not target_handle:
-            continue  # lege slot overslaan
+            continue
 
         logging.info("=== Account %s: target %s ===", label, target_handle)
 
         try:
             feed_posts = fetch_recent_posts(client, target_handle)
         except Exception as e:
-            logging.error(
-                "Kon feed voor %s niet ophalen bij account %s: %s",
-                target_handle,
-                label,
-                e,
-            )
+            logging.error("Feed ophalen mislukt: %s", e)
             continue
 
-        # Filter op media + (geen repost, behalve BleuskyBeauty)
         valid_posts = [
             fp for fp in feed_posts
             if is_valid_post_for_target(fp, target_handle)
         ]
 
         if not valid_posts:
-            logging.info(
-                "Geen geldige media-posts voor %s (geen reposts/geen tekst-only), skip.",
-                target_handle,
-            )
+            logging.info("Geen geldige media-posts, skip.")
             continue
 
-        to_repost = choose_posts_for_run(valid_posts, num_random_older=2)
+        to_repost = choose_posts_for_run(valid_posts)
 
         logging.info(
-            "Account %s gaat %d posts (nieuwste + random oudere, van oud->nieuw) (opnieuw) repost-en voor target %s.",
+            "Account %s repost %d posts voor %s.",
             label,
             len(to_repost),
             target_handle,
