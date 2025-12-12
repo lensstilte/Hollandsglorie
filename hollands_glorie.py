@@ -8,7 +8,7 @@ from atproto import Client
 # --------------------------------------------------
 # Config
 # --------------------------------------------------
-AUTHOR_FEED_LIMIT = 200  # ⬅️ HIER pas je het aantal terug te kijken posts aan
+AUTHOR_FEED_LIMIT = 100  # ⬅️ HIER pas je het aantal terug te kijken posts aan
 
 # --------------------------------------------------
 # Logging basic setup
