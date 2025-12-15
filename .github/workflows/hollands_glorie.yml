@@ -2,7 +2,7 @@ name: Hollands Glorie
 
 on:
   schedule:
-    - cron: "0 */2 * * *"  # elke 2 uur
+    - cron: "0 */4 * * *"  # elke 2 uur
   workflow_dispatch:
 
 jobs:
