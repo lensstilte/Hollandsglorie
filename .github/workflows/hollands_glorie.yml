@@ -1,9 +1,8 @@
 name: Hollands Glorie
 
 on:
-  schedule:
-    - cron: "0 */4 * * *"  # elke 2 uur
-  workflow_dispatch:
+  # schedule:
+  #   - cron: "0 * * * *"
 
 jobs:
   run-hollands-glorie:
