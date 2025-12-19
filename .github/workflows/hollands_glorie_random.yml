@@ -1,0 +1,37 @@
+name: Hollands Glorie (Random targets + feeds)
+
+on:
+  schedule:
+    - cron: "0 * * * *"   # ieder uur op :00
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    env:
+      BSKY_USERNAME_BEAUTYFAN: ${{ secrets.BSKY_USERNAME_BEAUTYFAN }}
+      BSKY_PASSWORD_BEAUTYFAN: ${{ secrets.BSKY_PASSWORD_BEAUTYFAN }}
+
+      BSKY_USERNAME_HOTBLEUSKY: ${{ secrets.BSKY_USERNAME_HOTBLEUSKY }}
+      BSKY_PASSWORD_HOTBLEUSKY: ${{ secrets.BSKY_PASSWORD_HOTBLEUSKY }}
+
+      BSKY_USERNAME_DMPHOTOS: ${{ secrets.BSKY_USERNAME_DMPHOTOS }}
+      BSKY_PASSWORD_DMPHOTOS: ${{ secrets.BSKY_PASSWORD_DMPHOTOS }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install atproto
+
+      - name: Run Hollands Glorie Random
+        run: python hollands_glorie_random.py
