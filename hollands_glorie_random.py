@@ -37,7 +37,7 @@ TARGET_HANDLE_4 = "velvetdesire.bsky.social"
 TARGET_HANDLE_5 = "sensushots.bsky.social"
 TARGET_HANDLE_6 = "steefschrijber1970.bsky.social"
 TARGET_HANDLE_7 = "damienmanson.bsky.social"
-TARGET_HANDLE_8 = "boxy0075.bsky.social"
+TARGET_HANDLE_8 = "bleuskybeauty.bsky.social"
 TARGET_HANDLE_9 = ""
 TARGET_HANDLE_10 = ""
 
