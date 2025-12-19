@@ -64,7 +64,7 @@ TARGET_HANDLES: List[str] = [
 # --------------------------------------------------
 FEED_1 = "https://bsky.app/profile/did:plc:jaka644beit3x4vmmg6yysw7/feed/aaadqdb77ba62"
 FEED_2 = "https://bsky.app/profile/did:plc:jaka644beit3x4vmmg6yysw7/feed/aaadqr7ar2b4i"
-FEED_3 = ""
+FEED_3 = "https://bsky.app/profile/did:plc:jaka644beit3x4vmmg6yysw7/feed/aaadqvg6ml67a"
 
 # Feed volgorde 3 -> 1 (zodat feed 1 later komt dan feed 3)
 FEEDS: List[str] = [FEED_3, FEED_2, FEED_1]
