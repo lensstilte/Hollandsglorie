@@ -1,6 +1,6 @@
 import os
-import random
 import time
+import random
 import logging
 from typing import List, Optional
 
@@ -9,22 +9,17 @@ from atproto import Client
 # --------------------------------------------------
 # Config
 # --------------------------------------------------
-AUTHOR_FEED_LIMIT = 100          # max 100 (Bluesky API limiet)
-FEED_LIMIT = 100                # max 100
-DELAY_SECONDS = 1               # 1 seconde tussen acties
-RANDOM_PER_TARGET = 1           # 1 random media post per target
-RANDOM_PER_FEED = 1             # 1 random media post per feed
+AUTHOR_FEED_LIMIT = 100   # max 100 (API limit)
+FEED_LIMIT = 100          # max 100 (API limit)
+DELAY_SECONDS = 1         # 1 seconde delay tussen acties
 
-# --------------------------------------------------
-# Logging
-# --------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 
 # --------------------------------------------------
-# Bot-accounts (environment suffixen)
+# Bot accounts (env suffixen)
 # --------------------------------------------------
 ACCOUNT_KEYS = [
     "BEAUTYFAN",
@@ -33,8 +28,7 @@ ACCOUNT_KEYS = [
 ]
 
 # --------------------------------------------------
-# 10 TARGET HANDLES (leeg = skip)
-# Vul hier je accounts in
+# 10 TARGETS (leeg = skip)
 # --------------------------------------------------
 TARGET_HANDLE_1 = "dmphotos.bsky.social"
 TARGET_HANDLE_2 = "theysaidnothing.bsky.social"
@@ -47,7 +41,7 @@ TARGET_HANDLE_8 = "boxy0075.bsky.social"
 TARGET_HANDLE_9 = ""
 TARGET_HANDLE_10 = ""
 
-# Volgorde: 10 -> 1 (1 eindigt bovenaan)
+# Target volgorde 10 -> 1 (zodat 1 als laatste komt, dus “bovenaan”)
 TARGET_HANDLES: List[str] = [
     TARGET_HANDLE_10,
     TARGET_HANDLE_9,
@@ -63,22 +57,46 @@ TARGET_HANDLES: List[str] = [
 
 # --------------------------------------------------
 # 3 FEEDS (leeg = skip)
-# Gebruik de "at://.../app.bsky.feed.generator/..." URI
+# Je mag hier:
+# - at://did:.../app.bsky.feed.generator/xxxx
+# - of https://bsky.app/profile/<did>/feed/<rkey>
+# plakken. Script maakt er zelf een at:// URI van.
 # --------------------------------------------------
-FEED_URI_1 = ""  # bijv: "at://did:plc:.../app.bsky.feed.generator/abcdef"
-FEED_URI_2 = ""
-FEED_URI_3 = ""
+FEED_1 = "https://bsky.app/profile/did:plc:jaka644beit3x4vmmg6yysw7/feed/aaadqdb77ba62"
+FEED_2 = ""
+FEED_3 = ""
 
-# Volgorde: 3 -> 1 (1 eindigt bovenaan)
-FEED_URIS: List[str] = [
-    FEED_URI_3,
-    FEED_URI_2,
-    FEED_URI_1,
-]
+# Feed volgorde 3 -> 1 (zodat feed 1 later komt dan feed 3)
+FEEDS: List[str] = [FEED_3, FEED_2, FEED_1]
+
 
 # --------------------------------------------------
 # Helpers
 # --------------------------------------------------
+def normalize_feed_uri(s: str) -> str:
+    s = (s or "").strip()
+    if not s:
+        return ""
+
+    if s.startswith("at://"):
+        return s
+
+    # bsky.app URL:
+    # https://bsky.app/profile/did:plc:XXXX/feed/YYYY
+    if "bsky.app/profile/" in s and "/feed/" in s:
+        try:
+            after = s.split("bsky.app/profile/", 1)[1]
+            profile_part, feed_part = after.split("/feed/", 1)
+            did_or_handle = profile_part.strip("/").split("/", 1)[0]
+            rkey = feed_part.strip("/").split("/", 1)[0]
+            # feed generator URI:
+            return f"at://{did_or_handle}/app.bsky.feed.generator/{rkey}"
+        except Exception:
+            return s  # laat hem dan maar falen met duidelijke error
+
+    return s
+
+
 def get_client_for_account(label: str) -> Optional[Client]:
     username = os.getenv(f"BSKY_USERNAME_{label}")
     password = os.getenv(f"BSKY_PASSWORD_{label}")
@@ -90,88 +108,11 @@ def get_client_for_account(label: str) -> Optional[Client]:
     client = Client()
     try:
         client.login(username, password)
-        logging.info("Ingelogd als %s (label=%s)", username, label)
+        logging.info("Ingelogd als *** (label=%s)", label)
         return client
     except Exception as e:
         logging.error("Login mislukt voor %s: %s", label, e)
         return None
-
-
-def has_media(post_view) -> bool:
-    """
-    True als er echt media is (foto/video/external thumb).
-    """
-    embed = getattr(post_view, "embed", None)
-    if not embed:
-        return False
-
-    # Images embed
-    images = getattr(embed, "images", None)
-    if isinstance(images, list) and images:
-        return True
-
-    # Video embed (sommige builds)
-    playlist = getattr(embed, "playlist", None)
-    if playlist:
-        return True
-
-    # RecordWithMedia kan ook 'media' hebben (maar dat is quote post -> wordt elders geblokt)
-    media = getattr(embed, "media", None)
-    if media:
-        media_images = getattr(media, "images", None)
-        if isinstance(media_images, list) and media_images:
-            return True
-        media_playlist = getattr(media, "playlist", None)
-        if media_playlist:
-            return True
-
-    # External (thumbnail)
-    external = getattr(embed, "external", None)
-    if external and getattr(external, "thumb", None):
-        return True
-
-    return False
-
-
-def is_quote_post(post_view) -> bool:
-    """
-    Quote posts zijn embed types met 'record' (AppBskyEmbedRecord of RecordWithMedia).
-    """
-    embed = getattr(post_view, "embed", None)
-    if not embed:
-        return False
-    record = getattr(embed, "record", None)
-    return record is not None
-
-
-def is_valid_post_item(feed_item) -> bool:
-    """
-    Regels:
-    - Geen reposts (dus reason == None)
-    - Geen replies (record.reply)
-    - Moet media hebben
-    - Geen quote post
-    """
-    # reposts overslaan
-    if getattr(feed_item, "reason", None) is not None:
-        return False
-
-    post_view = feed_item.post
-    record = getattr(post_view, "record", None)
-
-    # replies overslaan
-    if record and getattr(record, "reply", None):
-        return False
-
-    # quote overslaan
-    if is_quote_post(post_view):
-        return False
-
-    # tekst-only overslaan
-    if not has_media(post_view):
-        return False
-
-    return True
 
 
 def fetch_author_feed(client: Client, actor_handle: str):
@@ -180,34 +121,111 @@ def fetch_author_feed(client: Client, actor_handle: str):
         actor=actor_handle,
         limit=AUTHOR_FEED_LIMIT,
         filter="posts_no_replies",
-        include_pins=False,
     )
     return list(feed.feed or [])
 
 
-def fetch_custom_feed(client: Client, feed_uri: str):
-    logging.info("Custom feed ophalen %s (limit=%d)...", feed_uri, FEED_LIMIT)
-    # low-level call (stabiel over meerdere atproto versies)
-    res = client.app.bsky.feed.get_feed({"feed": feed_uri, "limit": FEED_LIMIT})
-    return list(getattr(res, "feed", []) or [])
+def fetch_generator_feed(client: Client, feed_uri: str):
+    feed_uri = normalize_feed_uri(feed_uri)
+    logging.info("Generator feed ophalen: %s (limit=%d)...", feed_uri, FEED_LIMIT)
+
+    # Sommige versies hebben client.get_feed, andere client.app.bsky.feed.get_feed
+    try:
+        resp = client.app.bsky.feed.get_feed({"feed": feed_uri, "limit": FEED_LIMIT})
+        return list(getattr(resp, "feed", []) or [])
+    except Exception:
+        resp = client.get_feed(feed=feed_uri, limit=FEED_LIMIT)  # fallback
+        return list(getattr(resp, "feed", []) or [])
 
 
-def pick_random_posts(valid_items: List, k: int) -> List:
-    if not valid_items or k <= 0:
-        return []
-    if len(valid_items) <= k:
-        chosen = list(valid_items)
-    else:
-        chosen = random.sample(valid_items, k=k)
+def is_quote_post(post_view) -> bool:
+    """
+    Quote-posts hebben meestal een embed met 'record' of 'record_with_media' (of varianten).
+    We sluiten die uit.
+    """
+    embed = getattr(post_view, "embed", None)
+    if not embed:
+        return False
 
-    # oud -> nieuw reposten, zodat nieuw bovenaan komt
-    chosen.sort(
-        key=lambda it: (
-            getattr(it.post, "indexed_at", None)
-            or getattr(it.post, "created_at", "")
-        )
-    )
-    return chosen
+    for attr in ["record", "record_with_media", "recordWithMedia", "recordWithMediaView", "record_view"]:
+        if getattr(embed, attr, None) is not None:
+            return True
+
+    # Sommige types hebben embed.record.* genest; bovenstaande vangt de meest voorkomende
+    return False
+
+
+def has_media(post_view) -> bool:
+    """
+    Alleen foto/video (geen text-only).
+    """
+    embed = getattr(post_view, "embed", None)
+    if not embed:
+        return False
+
+    # images
+    images = getattr(embed, "images", None)
+    if isinstance(images, list) and images:
+        return True
+
+    # video/playlist (verschilt per model)
+    for attr in ["playlist", "video", "aspect_ratio", "aspectRatio"]:
+        if getattr(embed, attr, None):
+            return True
+
+    # media container (recordWithMedia/video cases)
+    media = getattr(embed, "media", None)
+    if media:
+        media_images = getattr(media, "images", None)
+        if isinstance(media_images, list) and media_images:
+            return True
+        for attr in ["playlist", "video", "aspect_ratio", "aspectRatio"]:
+            if getattr(media, attr, None):
+                return True
+
+    return False
+
+
+def is_own_post_item(feed_item, target_handle: str) -> bool:
+    """
+    Voor targets: NIET reposts/reason items pakken, en author moet target zijn.
+    """
+    # feed_item.reason != None betekent “repost item in feed”
+    if getattr(feed_item, "reason", None) is not None:
+        return False
+
+    post = feed_item.post
+    author = getattr(post, "author", None)
+    if not author:
+        return False
+
+    return (author.handle or "").lower() == target_handle.lower()
+
+
+def valid_for_repost(feed_item, mode: str, target_handle: str = "") -> bool:
+    """
+    mode:
+      - "target": alleen echte eigen posts van die handle
+      - "feed": we nemen post items uit generator feed, maar géén repost/reason items
+    """
+    post = feed_item.post
+
+    if is_quote_post(post):
+        return False
+
+    if not has_media(post):
+        return False
+
+    if mode == "target":
+        return is_own_post_item(feed_item, target_handle)
+
+    if mode == "feed":
+        # in generator feed ook geen repost-items
+        if getattr(feed_item, "reason", None) is not None:
+            return False
+        return True
+
+    return False
 
 
 def unrepost_like_and_repost(client: Client, feed_item) -> None:
@@ -217,7 +235,7 @@ def unrepost_like_and_repost(client: Client, feed_item) -> None:
     repost_uri = getattr(viewer, "repost", None) if viewer else None
     like_uri = getattr(viewer, "like", None) if viewer else None
 
-    # eerst oude repost weg (als hij bestaat)
+    # eerst oude repost weg, dan opnieuw
     if repost_uri:
         logging.info("  Oude repost verwijderen...")
         try:
@@ -226,7 +244,6 @@ def unrepost_like_and_repost(client: Client, feed_item) -> None:
         except Exception as e:
             logging.warning("  Kon oude repost niet verwijderen: %s", e)
 
-    # opnieuw reposten
     try:
         client.repost(uri=post.uri, cid=post.cid)
         logging.info("  Repost gelukt: %s", post.uri)
@@ -234,7 +251,6 @@ def unrepost_like_and_repost(client: Client, feed_item) -> None:
         logging.error("  Repost mislukt: %s", e)
         return
 
-    # like toevoegen (als nog niet geliked)
     if not like_uri:
         try:
             client.like(uri=post.uri, cid=post.cid)
@@ -243,38 +259,44 @@ def unrepost_like_and_repost(client: Client, feed_item) -> None:
             logging.warning("  Like mislukt: %s", e)
 
 
+def pick_one_random(valid_items: List) -> Optional:
+    if not valid_items:
+        return None
+    return random.choice(valid_items)
+
+
 def process_account(label: str) -> None:
     logging.info("=== Start account %s ===", label)
     client = get_client_for_account(label)
     if not client:
         return
 
-    # 1) Feeds (3 -> 1)
-    for feed_uri in FEED_URIS:
-        feed_uri = (feed_uri or "").strip()
-        if not feed_uri:
+    # 1) eerst FEEDS (3->1)
+    for feed in FEEDS:
+        feed = (feed or "").strip()
+        if not feed:
             continue
 
+        feed_uri = normalize_feed_uri(feed)
         logging.info("=== Account %s: FEED %s ===", label, feed_uri)
+
         try:
-            items = fetch_custom_feed(client, feed_uri)
+            items = fetch_generator_feed(client, feed_uri)
         except Exception as e:
-            logging.error("Feed ophalen mislukt: %s", e)
+            logging.error("Feed ophalen mislukt (%s): %s", feed_uri, e)
             continue
 
-        valid = [it for it in items if is_valid_post_item(it)]
-        if not valid:
-            logging.info("Geen geldige media-posts in feed, skip.")
+        valid = [it for it in items if valid_for_repost(it, mode="feed")]
+        chosen = pick_one_random(valid)
+
+        if not chosen:
+            logging.info("Geen geldige media-posts in FEED, skip.")
             continue
 
-        chosen = pick_random_posts(valid, RANDOM_PER_FEED)
-        logging.info("Account %s: %d random post(s) uit feed.", label, len(chosen))
+        unrepost_like_and_repost(client, chosen)
+        time.sleep(DELAY_SECONDS)
 
-        for it in chosen:
-            unrepost_like_and_repost(client, it)
-            time.sleep(DELAY_SECONDS)
-
-    # 2) Targets (10 -> 1)
+    # 2) daarna TARGETS (10->1)
     for target_handle in TARGET_HANDLES:
         target_handle = (target_handle or "").strip()
         if not target_handle:
@@ -285,27 +307,25 @@ def process_account(label: str) -> None:
         try:
             items = fetch_author_feed(client, target_handle)
         except Exception as e:
-            logging.error("Author feed ophalen mislukt: %s", e)
+            logging.error("Author feed ophalen mislukt (%s): %s", target_handle, e)
             continue
 
-        valid = [it for it in items if is_valid_post_item(it)]
-        if not valid:
+        valid = [it for it in items if valid_for_repost(it, mode="target", target_handle=target_handle)]
+        chosen = pick_one_random(valid)
+
+        if not chosen:
             logging.info("Geen geldige media-posts voor %s, skip.", target_handle)
             continue
 
-        chosen = pick_random_posts(valid, RANDOM_PER_TARGET)
-        logging.info("Account %s: %d random post(s) uit target %s.", label, len(chosen), target_handle)
-
-        for it in chosen:
-            unrepost_like_and_repost(client, it)
-            time.sleep(DELAY_SECONDS)
+        unrepost_like_and_repost(client, chosen)
+        time.sleep(DELAY_SECONDS)
 
 
 def main():
-    logging.info("=== Start Hollands Glorie RANDOM run ===")
+    logging.info("=== Start Hollands Glorie RANDOM (targets+feeds) run ===")
     for label in ACCOUNT_KEYS:
         process_account(label)
-    logging.info("=== Hollands Glorie RANDOM run voltooid ===")
+    logging.info("=== Hollands Glorie run voltooid ===")
 
 
 if __name__ == "__main__":
