@@ -39,7 +39,7 @@ TARGET_HANDLE_6 = "steefschrijber1970.bsky.social"
 TARGET_HANDLE_7 = "damienmanson.bsky.social"
 TARGET_HANDLE_8 = "bleuskybeauty.bsky.social"
 TARGET_HANDLE_9 = "seismicshift101.bsky.social"
-TARGET_HANDLE_10 = ""
+TARGET_HANDLE_10 = "chrisvr46.bsky.social"
 
 # Target volgorde 10 -> 1 (zodat 1 als laatste komt, dus “bovenaan”)
 TARGET_HANDLES: List[str] = [
