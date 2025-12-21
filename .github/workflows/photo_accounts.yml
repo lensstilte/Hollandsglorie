@@ -2,7 +2,7 @@ name: Photo Accounts (list random repost)
 
 on:
   schedule:
-    - cron: "15 * * * *"   # elk uur op :00 (pas aan als je wil)
+    - cron: "15 * * * *"   # elk uur op :00  (wil je elke 2 uur: "0 */2 * * *")
   workflow_dispatch:
 
 jobs:
@@ -12,15 +12,13 @@ jobs:
     env:
       BSKY_USERNAME_BEAUTYFAN: ${{ secrets.BSKY_USERNAME_BEAUTYFAN }}
       BSKY_PASSWORD_BEAUTYFAN: ${{ secrets.BSKY_PASSWORD_BEAUTYFAN }}
-
       BSKY_USERNAME_HOTBLEUSKY: ${{ secrets.BSKY_USERNAME_HOTBLEUSKY }}
       BSKY_PASSWORD_HOTBLEUSKY: ${{ secrets.BSKY_PASSWORD_HOTBLEUSKY }}
-
       BSKY_USERNAME_DMPHOTOS: ${{ secrets.BSKY_USERNAME_DMPHOTOS }}
       BSKY_PASSWORD_DMPHOTOS: ${{ secrets.BSKY_PASSWORD_DMPHOTOS }}
 
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Python
@@ -33,5 +31,5 @@ jobs:
           python -m pip install --upgrade pip
           pip install atproto
 
-      - name: Run photo_accounts
+      - name: Run Photo Accounts
         run: python photo_accounts.py
