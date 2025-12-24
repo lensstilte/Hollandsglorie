@@ -2,7 +2,7 @@ name: Hollands Glorie (Random targets+feeds)
 
 on:
   schedule:
-    - cron: "15 * * * *"   # ieder uur op het hele uur (UTC)
+    - cron: "28 * * * *"   # ieder uur op het hele uur (UTC)
   workflow_dispatch:
 
 jobs:
