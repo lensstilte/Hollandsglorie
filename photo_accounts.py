@@ -14,7 +14,7 @@ from atproto import Client
 LIST_URL = "https://bsky.app/profile/did:plc:cxrt7ggxkamgzxa47cggtees/lists/3majejgaw3m2q"
 
 # Hoeveel reposts per bot-account per run
-MAX_REPOSTS_PER_RUN = 25
+MAX_REPOSTS_PER_RUN = 50
 
 # Pak per list-member random uit laatste N eigen posts (minder zwaar)
 PICK_FROM_LAST_N = 5
