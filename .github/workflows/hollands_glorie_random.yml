@@ -1,8 +1,4 @@
-name: Hollands Glorie (Random targets+feeds)
 
-on:
-  schedule:
-    - cron: "54 * * * *"   # ieder uur op het hele uur (UTC)
   workflow_dispatch:
 
 jobs:
