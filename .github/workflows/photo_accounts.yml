@@ -1,4 +1,8 @@
+name: Photo Accounts (list random repost)
 
+on:
+  schedule:
+    - cron: "34 * * * *"   # elk uur op :00  (wil je elke 2 uur: "0 */2 * * *")
   workflow_dispatch:
 
 jobs:
